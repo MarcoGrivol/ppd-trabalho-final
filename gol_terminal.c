@@ -1,3 +1,5 @@
+// compile: gcc gol_terminal.c -o gol_terminal
+
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,7 +8,7 @@
 
 #ifdef __linux__
     #define console NULL
-    void mysleep(msec) { usleep(msec * 1000) };
+    void mysleep(msec) { usleep(msec * 1000); };
     void clrscr() { printf("\e[1;1H\e[2J"); }
 #elif _WIN32
     #include <windows.h>
