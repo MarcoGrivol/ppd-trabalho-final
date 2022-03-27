@@ -87,19 +87,22 @@ void updateState(bool *grid, bool *next_grid, int N) {
         next_grid[i * N] = cellStateBorder(grid, i, 0, N);
         next_grid[i * N + (N - 1)] = cellStateBorder(grid, i, N - 1, N);
     }
-    copyToGrid(grid, next_grid, N);
+    // copyToGrid(grid, next_grid, N);
+    memcpy(grid, next_grid, sizeof(bool) * N * N);
 }
 
-int main() {
+int main(int argc, char **argv) {
     srand(time(NULL));
 
-    int N;
+    int N, gens;
     printf("Digite o tamanho do tabuleiro/grid (NxN): N=");
     scanf("%d", &N);
     if (N < 500) {
         printf("ERROR: N < 500 não gera uma boa visualização.\n");
         return -1;
     }
+    printf("Digite a quantidade de gerações (1000 recomendado): G=");
+    scanf("%d", &gens);
 
     SDL_Init(SDL_INIT_VIDEO);
     SDL_Window *window = SDL_CreateWindow(
@@ -130,7 +133,13 @@ int main() {
         copyGridToPixels(pixels, grid, N);
         SDL_Delay(10);
         SDL_UpdateWindowSurface(window);
+        printf("\rGeração: %10d", gens);
+        fflush(stdout);
+        if (--gens == 0) {
+        	isRunning = false;
+        }
     }
+    printf("\n");
     free(grid);
     free(next_grid);
     return 0;
