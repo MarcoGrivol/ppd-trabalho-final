@@ -1,4 +1,4 @@
-// compile: gcc gol_terminal.c -o gol_terminal
+// compile: gcc gol.c -o gol
 
 #include <time.h>
 #include <stdio.h>
@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#include <sys/time.h>
 
 bool cellState(bool *grid, int row, int col, int N) {
     int sum =  
@@ -73,21 +74,32 @@ void updateState(bool *grid, bool *next_grid, int N) {
 }
 
 int main() {
-    srand(time(NULL));
-    int N, gens;
-    printf("Digite o tamanho do tabuleiro/grid (NxN): N=");
-    scanf("%d", &N);
-    printf("Digite a quantidade de gerações (1000 recomendado): G=");
-    scanf("%d", &gens);
+    srand(42);
+    int N, G;
+    // printf("Digite o tamanho do tabuleiro/grid (NxN): N=");
+    // scanf("%d", &N);
+    // printf("Digite a quantidade de gerações (1000 recomendado): G=");
+    // scanf("%d", &G);
+    N = 1000;
+    G = 1000;
+    int gens = G;
 
     bool *grid = malloc(N * N * sizeof(bool));
     bool *next_grid = malloc(N * N * sizeof(bool));
     for (int i = 0; i < N * N; i++) {
         grid[i] = (int) rand() % 2;
     }
-    while (--gens != 0) {
+    struct timeval t0, t1;
+    float elapsed_time;
+    gettimeofday(&t0, NULL);
+    while (gens-- != 0) {
         updateState(grid, next_grid, N);
     }
+    gettimeofday(&t1, NULL);
+    elapsed_time = (t1.tv_sec - t0.tv_sec) + 
+        (t1.tv_usec - t0.tv_usec) / 1000000.;
+    printf("Time for grid(%d, %d) & %d generation: %.3f s\n", N, N, G, elapsed_time);
+    printf("Generations per second: %.3f g/s\n", (float) G / elapsed_time);
     free(grid);
     free(next_grid);
     return 0;
