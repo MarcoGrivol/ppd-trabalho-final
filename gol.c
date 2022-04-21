@@ -6,7 +6,7 @@
 int main() {
     srand(42);
     
-    int N = 50 + 2;
+    int N = 10 + 2;
     int G = 1000;
 
     bool *grid = malloc(N * N * sizeof(bool));
