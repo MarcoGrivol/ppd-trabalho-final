@@ -19,90 +19,67 @@ void copyGridToPixels(int *pixels, bool *grid, int N) {
     }
 }
 
-bool cellState(bool *grid, int row, int col, int N) {
-    int sum =  
-        grid[(row - 1) * N + col - 1] + // [-1, -1]
-        grid[(row - 1) * N + col    ] + // [-1, 0]
-        grid[(row - 1) * N + col + 1] + // [-1, 1]
-        grid[ row      * N + col - 1] + // [0, -1]
-        grid[ row      * N + col + 1] + // [0, 1]
-        grid[(row + 1) * N + col - 1] + // [1, -1]
-        grid[(row + 1) * N + col    ] + // [1, 0]
-        grid[(row + 1) * N + col + 1];  // [1, 1]
-    if (grid[row * N + col]) {
-        // is alive
-        if (sum == 2 || sum == 3) 
-            return true;
-        return false;
-    }
-    // is dead
-    if (sum == 3)
-        return true;
-    return false;
+void swap(bool **grid, bool **next_grid) {
+    // Update grid to receive last iteration
+    bool *aux = *grid;
+    *grid = *next_grid;
+    *next_grid = aux;
 }
 
-bool cellStateBorder(bool *grid, int row, int col, int N) {
-    int r, c, sum = 0;
-    for (int i = row - 1; i <= row + 1; i++) {
-        r = i < 0 ? N - 1 : i;
-        r = i >= N ? 0 : r;
-        for (int j = col - 1; j <= col + 1; j++) {
-            c = j < 0 ? N - 1 : j;
-            c = j >= N ? 0 : c;
-            if (r != row || c != col) {
-                sum += grid[r * N + c];
+void updateState(int N, int G, bool *grid, bool *next_grid) {
+    // for each iteration
+    for (int i = 1; i < N - 1; i++) { 
+        // for each row, excluding borders
+        for (int j = 1; j < N - 1; j++) { 
+            // for each col, excluding borders
+            // counts the number of live neighbors
+            int sum =  
+                grid[(i - 1) * N + j - 1] + // [-1, -1]
+                grid[(i - 1) * N + j    ] + // [-1,  0]
+                grid[(i - 1) * N + j + 1] + // [-1,  1]
+                grid[ i      * N + j - 1] + // [ 0, -1]
+                grid[ i      * N + j + 1] + // [ 0,  1]
+                grid[(i + 1) * N + j - 1] + // [ 1, -1]
+                grid[(i + 1) * N + j    ] + // [ 1,  0]
+                grid[(i + 1) * N + j + 1];  // [ 1,  1]
+            // updates cell state
+            if (grid[i * N + j]) {
+                // is alive
+                if (sum == 2 || sum == 3) next_grid[i * N + j] = true;
+                else next_grid[i * N + j] = false;
+            } 
+            else {
+                // is dead
+                if (sum == 3) next_grid[i * N + j] = true;
+                else next_grid[i * N + j] = false;
             }
         }
     }
-    if (grid[row * N + col]) {
-        // is alive
-        if (sum == 2 || sum == 3)
-            return true;
-        return false;
-    }
-    // is dead
-    if (sum == 3)
-        return true;
-    return false;
-}
-
-void copyToGrid(bool *grid, bool *next_grid, int N) {
-    for (int i = 0; i < N * N; i++) {
-        grid[i] = next_grid[i];
-    }
-}
-
-void updateState(bool *grid, bool *next_grid, int N) {
-    bool state;
+    // wrap-around padding
+    // copy first and last row borders
     for (int i = 1; i < N - 1; i++) {
-        for (int j = 1; j < N - 1; j++) {
-            next_grid[i * N + j] = cellState(grid, i, j, N);
-        }
+        next_grid[i] = next_grid[(N - 2) * N + i];
+        next_grid[(N - 1) * N + i] = next_grid[N + i];
     }
+    // copy left and right borders
     for (int j = 0; j < N; j++) {
-        next_grid[0 * N + j] = cellStateBorder(grid, 0, j, N);
-        next_grid[(N - 1) * N + j] = cellStateBorder(grid, N - 1, j, N);
+        next_grid[j * N] = next_grid[j * N + N - 2];
+        next_grid[j * N + N - 1] = next_grid[j * N + 1];
     }
-    for (int i = 1; i < N - 1; i++) {
-        next_grid[i * N] = cellStateBorder(grid, i, 0, N);
-        next_grid[i * N + (N - 1)] = cellStateBorder(grid, i, N - 1, N);
-    }
-    // copyToGrid(grid, next_grid, N);
-    memcpy(grid, next_grid, sizeof(bool) * N * N);
 }
 
 int main(int argc, char **argv) {
     srand(time(NULL));
 
-    int N, gens;
+    int N, G;
     printf("Digite o tamanho do tabuleiro/grid (NxN): N=");
     scanf("%d", &N);
-    if (N < 500) {
-        printf("ERROR: N < 500 não gera uma boa visualização.\n");
+    if (N < 100) {
+        printf("ERROR: N < 100 não gera uma boa visualização.\n");
         return -1;
     }
     printf("Digite a quantidade de gerações (1000 recomendado): G=");
-    scanf("%d", &gens);
+    scanf("%d", &G);
 
     SDL_Init(SDL_INIT_VIDEO);
     SDL_Window *window = SDL_CreateWindow(
@@ -122,6 +99,17 @@ int main(int argc, char **argv) {
     for (int i = 0; i < N * N; i++) {
         grid[i] = (int) rand() % 2;
     }
+    // wrap-around padding
+    // copy first and last row borders
+    for (int i = 1; i < N - 1; i++) {
+    	next_grid[i] = next_grid[(N - 2) * N + i];
+    	next_grid[(N - 1) * N + i] = next_grid[N + i];
+    }
+    // copy left and right borders
+    for (int j = 0; j < N; j++) {
+	next_grid[j * N] = next_grid[j * N + N - 2];
+	next_grid[j * N + N - 1] = next_grid[j * N + 1];
+    }
     bool isRunning = true;
     while (isRunning) {
         while (SDL_PollEvent(&event) != 0) {
@@ -129,13 +117,14 @@ int main(int argc, char **argv) {
                 isRunning = false;
             }
         }
-        updateState(grid, next_grid, N);
+        updateState(N, G, grid, next_grid);
+        swap(&grid, &next_grid);
         copyGridToPixels(pixels, grid, N);
         SDL_Delay(10);
         SDL_UpdateWindowSurface(window);
-        printf("\rGeração: %10d", gens);
+        printf("\rGeração: %10d", G);
         fflush(stdout);
-        if (--gens == 0) {
+        if (--G == 0) {
         	isRunning = false;
         }
     }
