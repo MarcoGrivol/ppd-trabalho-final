@@ -12,12 +12,9 @@ void swap(bool **grid, bool **next_grid) {
 
 void runAllGenerations(int N, int G, bool *grid, bool *next_grid) {
     // Updates the state of the grid G times.
-    for (int g = 0; g < G; g++) { 
-        // for each iteration
-        for (int i = 1; i < N - 1; i++) { 
-            // for each row, excluding borders
-            for (int j = 1; j < N - 1; j++) { 
-                // for each col, excluding borders
+    for (int g = 0; g < G; g++) {                   // for each iteration
+        for (int i = 1; i < N - 1; i++) {           // for each row, excluding borders
+            for (int j = 1; j < N - 1; j++) {       // for each col, excluding borders
                 // counts the number of live neighbors
                 int sum =  
                     grid[(i - 1) * N + j - 1] + // [-1, -1]
@@ -104,20 +101,25 @@ int main(int argc, char *argv[]) {
     printf("Generations per second: %.2f g/s\n", (float) G / elapsed_time);
 
     // save result to file
+    bool *grid_nopad = (bool *) malloc((N - 2) * (N - 2) * sizeof(bool));
+    for (int i = 1; i < N - 1; i++) {
+        for (int j = 1; j < N - 1; j++) {
+            grid_nopad[(i - 1) * (N - 2) + j - 1] = grid[i * N + j];
+        }
+    }
     FILE *fp;
     fp = fopen("correct_grid.bin", "wb");
-    fwrite(grid, sizeof(*grid), N * N, fp);
+    fwrite(grid_nopad, sizeof(*grid_nopad), (N - 2) * (N - 2), fp);
     fclose(fp);
-
     //verify integrity of results
-    bool *correct_grid = malloc(N * N * sizeof(bool));
+    bool *correct_grid = malloc((N - 2) * (N - 2) * sizeof(bool));
     fp = fopen("correct_grid.bin", "rb");
-    int rc = fread(correct_grid, sizeof(*grid), N * N, fp);
+    int rc = fread(correct_grid, sizeof(*grid_nopad), (N - 2) * (N - 2), fp);
     fclose(fp);
-    if (rc == N * N) {
+    if (rc == (N - 2) * (N - 2)) {
         int errors = 0;
-        for (int i = 0; i < N * N; i++) {
-            if (correct_grid[i] != grid[i]) {
+        for (int i = 0; i < (N - 2) * (N - 2); i++) {
+            if (correct_grid[i] != grid_nopad[i]) {
                 errors++;
             }
         }
