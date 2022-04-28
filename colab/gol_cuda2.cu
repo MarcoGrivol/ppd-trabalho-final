@@ -96,7 +96,8 @@ int main(int argc, char *argv[]) {
     runAllGenerations(N, G, d_grid, d_next_grid);
 
     // copy grid from device to host
-    cudaMemcpy(grid, d_next_grid, N * N * sizeof(bool), cudaMemcpyDeviceToHost);
+    if (G % 2 != 0) cudaMemcpy(grid, d_next_grid, N * N * sizeof(bool), cudaMemcpyDeviceToHost);
+    else cudaMemcpy(grid, d_grid, N * N * sizeof(bool), cudaMemcpyDeviceToHost);
     cudaFree(d_grid);
     cudaFree(d_next_grid);
 

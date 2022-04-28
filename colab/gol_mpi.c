@@ -10,7 +10,16 @@
 struct info {
     int start;
     int end;
+    int send_first_to;
+    int send_last_to;
 } t_info;
+
+void swap(bool **grid, bool **next_grid) {
+    // Update grid to receive last iteration
+    bool *aux = *grid;
+    *grid = *next_grid;
+    *next_grid = aux;
+}
 
 void copyBorders(bool *grid, int N) {
     // wrap-around padding
@@ -53,6 +62,7 @@ void masterRoutine(int numtasks, int N, int G) {
 
     bool *grid = (bool *) malloc(N * N * sizeof(bool));
     // ramdomly initializes the grid
+    
     for (int i = 1; i < N - 1; i++) {
         for (int j = 1; j < N - 1; j++) {
             grid[i * N + j] = (int) rand() % 2;
@@ -72,6 +82,8 @@ void masterRoutine(int numtasks, int N, int G) {
     for (int i = 1; i < numtasks; i++) {
         t_infos[i - 1].start = start;
         t_infos[i - 1].end = end;
+        t_infos[i - 1].send_first_to = i - 1 == 0 ? numtasks - 1 : i - 1;
+        t_infos[i - 1].send_last_to = i + 1 == numtasks ? 1 : i + 1;
         MPI_Send(&t_infos[i - 1], sizeof(t_infos[i - 1]), MPI_INT, i, 1, MPI_COMM_WORLD);
         start = end - 1;
         if (i == numtasks - 2)
@@ -81,13 +93,9 @@ void masterRoutine(int numtasks, int N, int G) {
     }
 
     // Update the grid
-    for (int g = 0; g < G; g++) {
-        // Sends and receives the grid from each task
-        sendGrid(numtasks, t_infos, grid, N);
-        recvGrid(numtasks, t_infos, grid, N);
-        copyBorders(grid, N);
-    }
-    
+    sendGrid(numtasks, t_infos, grid, N);
+    recvGrid(numtasks, t_infos, grid, N);
+    copyBorders(grid, N);
 
     gettimeofday(&t1, NULL);
     // end timer
@@ -100,18 +108,16 @@ void masterRoutine(int numtasks, int N, int G) {
     printf("Generations per second: %.2f g/s\n", (float) G / elapsed_time);
 
     //verify integrity
-    bool *correct_grid = malloc((N - 2) * (N - 2) * sizeof(bool));
+    bool *correct_grid = malloc(N * N * sizeof(bool));
     FILE *fp;
     fp = fopen("correct_grid.bin", "rb");
-    int rc = fread(correct_grid, sizeof(*correct_grid), (N - 2) * (N - 2), fp);
+    int rc = fread(correct_grid, sizeof(*grid), N * N, fp);
     fclose(fp);
-    if (rc == (N - 2) * (N - 2)) {
+    if (rc == N * N) {
         int errors = 0;
-        for (int i = 1; i < N - 1; i++) {
-            for (int j = 1; j < N - 1; j++) {
-                if (correct_grid[(i - 1) * (N - 2) + j - 1] != grid[i * N + j]) {
-                    errors++;
-                }
+        for (int i = 0; i < N * N; i++) {
+            if (correct_grid[i] != grid[i]) {
+                errors++;
             }
         }
         printf("%d errors\n", errors);
@@ -134,17 +140,15 @@ void workerRoutine(int rank, int N, int G) {
     // allocate necessary memory
     bool *grid = (bool *) malloc(numrows * N * sizeof(bool));;
     bool *next_grid = (bool *) malloc(numrows * N * sizeof(bool));
+
+    for (int i = 0; i < numrows; i++) 
+        MPI_Recv(&grid[i * N], N, MPI_C_BOOL, 0, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     
     // iterate over all generations
     for (int g = 0; g < G; g++) {
-        int i, j;
-        // for each generation, receive corresponding portion of the grid
-        for (i = 0; i < numrows; i++) 
-           MPI_Recv(&grid[i * N], N, MPI_C_BOOL, 0, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
         // Update State
-        for (i = 1; i < numrows - 1; i++) {
-            for (j = 1; j < N - 1; j++) {
+        for (int i = 1; i < numrows - 1; i++) {
+            for (int j = 1; j < N - 1; j++) {
                 int sum =  
                     grid[(i - 1) * N + j - 1] + // [-1, -1]
                     grid[(i - 1) * N + j    ] + // [-1,  0]
@@ -166,11 +170,34 @@ void workerRoutine(int rank, int N, int G) {
                 }
             }
         }
-
-        // sends the updated portion back
-        for (i = 1; i < numrows - 1; i++)
-            MPI_Send(&next_grid[i * N], N, MPI_C_BOOL, 0, 1, MPI_COMM_WORLD);
+        if (t_info.send_first_to != rank) { // if false, there are no other workers
+            // copy left and right borders
+            for (int row = 1; row < numrows; row++) {
+                next_grid[row * N] = next_grid[row * N + N - 2];
+                next_grid[row * N + N - 1] = next_grid[row * N + 1];
+            }
+            // sends the updated portion to other workers
+            if (t_info.send_first_to != -1) {
+                // sending first row (index 1) to task t_info.send_first_to
+                MPI_Send(&next_grid[1 * N], N, MPI_C_BOOL, t_info.send_first_to, 1, MPI_COMM_WORLD);
+            }
+            if (t_info.send_last_to != -1) {
+                // sending last row (index last - 1) to task t_info.send_last_to
+                MPI_Send(&next_grid[(numrows - 2) * N], N, MPI_C_BOOL, t_info.send_last_to, 1, MPI_COMM_WORLD);
+            }
+            // receive upper and lower borders from other tasks
+            MPI_Recv(&next_grid[0], N, MPI_C_BOOL, t_info.send_first_to, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Recv(&next_grid[(numrows - 1) * N], N, MPI_C_BOOL, t_info.send_last_to, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
+        else {
+            // if there are no workers, functions like sequential version
+            copyBorders(next_grid, N);
+        }
+        swap(&grid, &next_grid);
     }
+    // sends the updated portion back to master
+    for (int i = 1; i < numrows - 1; i++)
+        MPI_Send(&grid[i * N], N, MPI_C_BOOL, 0, 1, MPI_COMM_WORLD);
     free(grid);
     free(next_grid);
 }

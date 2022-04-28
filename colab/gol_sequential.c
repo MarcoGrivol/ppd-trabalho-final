@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
     gettimeofday(&t0, NULL);
 
     runAllGenerations(N, G, grid, next_grid);
-    swap(&grid, &next_grid);
+    if (G % 2 != 0) swap(&grid, &next_grid);
 
     gettimeofday(&t1, NULL);
     // end timer
@@ -101,25 +101,20 @@ int main(int argc, char *argv[]) {
     printf("Generations per second: %.2f g/s\n", (float) G / elapsed_time);
 
     // save result to file
-    bool *grid_nopad = (bool *) malloc((N - 2) * (N - 2) * sizeof(bool));
-    for (int i = 1; i < N - 1; i++) {
-        for (int j = 1; j < N - 1; j++) {
-            grid_nopad[(i - 1) * (N - 2) + j - 1] = grid[i * N + j];
-        }
-    }
     FILE *fp;
     fp = fopen("correct_grid.bin", "wb");
-    fwrite(grid_nopad, sizeof(*grid_nopad), (N - 2) * (N - 2), fp);
+    fwrite(grid, sizeof(*grid), N * N, fp);
     fclose(fp);
+
     //verify integrity of results
-    bool *correct_grid = malloc((N - 2) * (N - 2) * sizeof(bool));
+    bool *correct_grid = malloc(N * N * sizeof(bool));
     fp = fopen("correct_grid.bin", "rb");
-    int rc = fread(correct_grid, sizeof(*grid_nopad), (N - 2) * (N - 2), fp);
+    int rc = fread(correct_grid, sizeof(*grid), N * N, fp);
     fclose(fp);
-    if (rc == (N - 2) * (N - 2)) {
+    if (rc == N * N) {
         int errors = 0;
-        for (int i = 0; i < (N - 2) * (N - 2); i++) {
-            if (correct_grid[i] != grid_nopad[i]) {
+        for (int i = 0; i < N * N; i++) {
+            if (correct_grid[i] != grid[i]) {
                 errors++;
             }
         }

@@ -131,7 +131,8 @@ int main(int argc, char *argv[]) {
     runAllGenerations(N, G, d_grid, d_next_grid);
 
     // copy grid from device to host
-    cudaMemcpy(grid, d_next_grid, N * N * sizeof(bool), cudaMemcpyDeviceToHost);
+    if (G % 2 != ) cudaMemcpy(grid, d_next_grid, N * N * sizeof(bool), cudaMemcpyDeviceToHost);
+    else cudaMemcpy(grid, d_grid, N * N * sizeof(bool), cudaMemcpyDeviceToHost);
     cudaFree(d_grid);
     cudaFree(d_next_grid);
 
@@ -145,18 +146,16 @@ int main(int argc, char *argv[]) {
     printf("Time for grid %d x %d and %d generations: %.3f s\n", N-2, N-2, G, elapsed_time);
     printf("Generations per second: %.1f g/s\n", (float) G / elapsed_time);
     //verify integrity
-    bool *correct_grid = (bool *) malloc((N - 2) * (N - 2) * sizeof(bool));
+    bool *correct_grid = (bool *) malloc(N * N * sizeof(bool));
     FILE *fp;
     fp = fopen("correct_grid.bin", "rb");
-    int rc = fread(correct_grid, sizeof(*correct_grid), (N - 2) * (N - 2), fp);
+    int rc = fread(correct_grid, sizeof(*grid), N * N, fp);
     fclose(fp);
-    if (rc == (N - 2) * (N - 2)) {
+    if (rc == N * N) {
         int errors = 0;
-        for (int i = 1; i < N - 1; i++) {
-            for (int j = 1; j < N - 1; j++) {
-                if (correct_grid[(i - 1) * (N - 2) + j - 1] != grid[i * N + j]) {
-                    errors++;
-                }
+        for (int i = 0; i < N * N; i++) {
+            if (correct_grid[i] != grid[i]) {
+                errors++;
             }
         }
         printf("%d errors\n", errors);
